@@ -1,0 +1,106 @@
+---
+layout:     post
+title:      "深入理解JAVA虚拟机学习笔记"
+subtitle:   "第五章 调优案例分析"
+date:       2016-01-24
+author:     "brucechen"
+header-img: "img/post-bg-java.jpg"
+tags:
+    - Java
+    - 读书笔记
+---
+
+### 高性能硬件下程序部署策略：
+一个15万PV/天左右的在线文档类型网站最近更换了硬件系统，新的硬件为4个CPU、16GB物理内存，操作系统为64位CentOS 5.4，Resin作为Web服务器。整个服务器暂时没有部署别的应用，所有硬件资源都可以提供给这访问量并不算太大的网站使用。管理员为了尽量利用硬件资源选用了64位的JDK 1.5，并通过-Xmx和-Xms参数将Java堆固定在12GB。使用一段时间后发现使用效果并不理想，网站经常不定期出现长时间失去响应的情况。监控服务器运行状况后发现网站失去响应是由GC停顿导致的，虚拟机运行在Server模式，默认使用吞吐量优先收集器，回收12GB的堆，一次Full GC的停顿时间高达14秒。并且由于程序设计的关系，访问文档时要把文档从磁盘提取到内存中，导致内存中出现很多由文档序列化产生的大对象，这些大对象很多都进入了老年代，没有在Minor GC中清理掉。这种情况下即使有12GB的堆，内存也很快被消耗殆尽，由此导致每隔十几分钟出现十几秒的停顿。
+ **问题分析：** 
+高性能硬件下部署通常有两种方法：通过64位JDK来使用大内存构建超大堆，使用若干个32位虚拟机建立逻辑集群来利用硬件资源。
+对于用户交互能力强，停顿时间敏感的系统，使用超大堆的前提是GC频率在可控范围内，大多数对象的生命周期不应太长，尤其是不能有成批量的、长生存时间的大对象产生，这样才能保障老年代空间的稳定。大多数网站形式的应用中，主要对象的生命周期应该是请求及或页面级的，会话级和全局级的长生命周期的对象相对较少。如果代码合理处理生成对象，是可以保证老年代GC不会频繁产生，保证网站的响应速度。不过，现阶段使用64位JDK还有以下问题：
+内存回收导致的长时间停顿、现阶段，64位JDK的性能测试结果普遍低于32位JDK、需要保证程序足够稳定，因为这种应用要是产生堆溢出几乎就无法产生堆转储快照（因为要产生十几GB乃至更大的Dump文件），哪怕产生了快照也几乎无法进行分析、相同程序在64位JDK消耗的内存一般比32位JDK大，这是由于指针膨胀，以及数据类型对齐补白等因素导致的。
+所以，现阶段一般使用若干个32位虚拟机建立逻辑集群来利用硬件资源。具体做法是在一台物理机器上启动多个应用服务器进程，每个服务器进程分配不同端口，然后在前端搭建一个负载均衡器，以反向代理的方式来分配访问请求。因为建立逻辑集群的目的仅仅是为了尽可能利用硬件资源，并不需要关心状态保留、热转移之类的高可用性需求，也不需要保证每个虚拟机进程有绝对准确的均衡负载，因此使用无Session复制的亲合式集群是一个相当不错的选择。我们仅仅需要保障集群具备亲合性，也就是均衡器按一定的规则算法（一般根据SessionID分配）将一个固定的用户请求永远分配到固定的一个集群节点进行处理即可。这种方式同样存在一些问题：
+节点竞争全局的资源，最典型的就是磁盘竞争，各个节点如果同时访问某个磁盘文件的话（尤其是并发写操作容易出现问题），很容易导致IO异常、很难最高效率地利用某些资源池，譬如连接池，一般都是在各个节点建立自己独立的连接池，这样有可能导致一些节点池满了而另外一些节点仍有较多空余。尽管可以使用集中式的JNDI，但这个有一定复杂性并且可能带来额外的性能开销、各个节点仍然不可避免地受到32位的内存限制，在32位Windows平台中每个进程只能使用2GB的内存，考虑到堆以外的内存开销，堆一般最多只能开到1.5GB。在某些Linux或UNIX系统（如Solaris）中，可以提升到3GB乃至接近4GB的内存，但32位中仍然受最高4GB（232）内存的限制、大量使用本地缓存（如大量使用HashMap作为K/V缓存）的应用，在逻辑集群中会造成较大的内存浪费，因为每个逻辑节点上都有一份缓存，这时候可以考虑把本地缓存改为集中式缓存。
+ **解决方法：**
+部署方案调整为建立5个32位JDK的逻辑集群，每个进程按2GB内存计算（其中堆固定为1.5GB），占用了10GB内存。另外建立一个Apache服务作为前端均衡代理访问门户。考虑到用户对响应速度比较关心，并且文档服务的主要压力集中在磁盘和内存访问，CPU资源敏感度较低，因此改为CMS收集器进行垃圾回收。部署方式调整后，服务再没有出现长时间停顿，速度比硬件升级前有较大提升。
+
+### 集群间同步导致的内存溢出
+有一个基于B/S的MIS系统，硬件为两台2个CPU、8GB内存的HP小型机，服务器是WebLogic 9.2，每台机器启动了3个WebLogic实例，构成一个6个节点的亲合式集群。由于是亲合式集群，节点之间没有进行Session同步，但是有一些需求要实现部分数据在各个节点间共享。开始这些数据存放在数据库中，但由于读写频繁竞争很激烈，性能影响较大，后面使用JBossCache构建了一个全局缓存。全局缓存启用后，服务正常使用了一段较长的时间，但最近却不定期地出现了多次的内存溢出问题。分析heapdump文件，发现里面存在着大量的org.jgroups.protocols.pbcast.NAKACK对象。
+ **问题分析：**
+JBossCache基于JGroups进行集群间的数据通信，使用协议栈的方式实现收发数据包的各种特性自由组合，数据包接收和发送都需要经过每层协议栈的up()和down()方法，NAKACK栈就是为了保证数据包的有效顺序和重发。
+由于信息有传输失败需要重发的可能性，在确认所有注册在GMS（Group Membership Service）的节点都收到正确的信息前，发送的信息必须在内存中保留。MIS的服务端中有一个负责安全校验的全局Filter，每当接收到请求时，均会更新一次最后操作时间，并且将这个时间同步到所有的节点去，使得一个用户在一段时间内不能在多台机器上登录。在服务使用过程中，往往一个页面会产生数次乃至数十次的请求，因此这个过滤器导致集群各个节点之间网络交互非常频繁。当网络情况不能满足传输要求时，重发数据在内存中不断堆积，很快就产生了内存溢出。集群共享的数据使用 集群缓存来同步的话，可以允许读操作频繁，因为数据在本地内存有一份副本，读取的动作不会耗费多少资源，但不应当有过于频繁的写操作，那样会带来很大的网络同步的开销。
+ **解决方法：**
+降低客户端同步请求的频率
+
+### 堆外内存导致的溢出错误
+一个学校的小型项目：基于B/S的电子考试系统，为了实现客户端能实时地从服务器端接收考试数据，系统使用了逆向AJAX技术（也称为Comet或者Server Side Push），选用CometD 1.1.1作为服务端推送框架，服务器是Jetty 7.1.4，硬件为一台普通PC机，Core i5 CPU，4GB内存，运行32位Win-dows操作系统。测试期间发现服务端不定时抛出内存溢出异常，通过内存检测工具，发现GC并不频繁，Eden区、Survivor区、老年代以及永久代内存都很正常，堆栈日志中发现如下错误：
+
+```
+[org.eclipse.jetty.util.log] handle failed java.lang.OutOfMemoryError: null
+at sun.misc.Unsafe.allocateMemory(Native Method)
+at java.nio.DirectByteBuffer.<init>(DirectByteBuffer.java:99)
+at java.nio.ByteBuffer.allocateDirect(ByteBuffer.java:288)
+at org.eclipse.jetty.io.nio.DirectNIOBuffer.<init>
+```
+ **问题分析：**
+操作系统对每个进程能管理的内存是有限制的，这台服务器使用的32位Windows平台的限制是2GB，其中划了1.6GB给Java堆，而Direct Mem-ory内存并不算入1.6GB的堆之内，因此它最大也只能在剩余的0.4GB空间中分出一部分。在此应用中导致溢出的关键是：垃圾收集进行时，虚拟机虽然会对Direct Memory进行回收，但是Direct Memory却不能像新生代、老年代那样，发现空间不足了就通知收集器进行垃圾回收，它只能等待老年代满了后Full GC，然后“顺便地”帮它清理掉内存的废弃对象。否则它只能一直等到抛出内存溢出异常时，先catch掉，再在catch块里面“大喊”一声：“System.gc()！”。要是虚拟机还是不听（譬如打开了-XX:+DisableExplicitGC开关），那就只能眼睁睁地看着堆中还有许多空闲内存，自己却不得不抛出内存溢出异常了。而本案例中使用的CometD 1.1.1框架，正好有大量的NIO操作需要使用到Direct Memory内存。
+除了JAVA堆和永久代外，还有下面区域也会占用大量内存，内存总和受到操作系统进程最大内存限制。
+ + Direct Memory：可通过-XX:MaxDirectMemorySize调整大小，内存不足时抛出OutOfMemoryError或者Out-OfMemoryError：Direct buffer memory。  
+ + 线程堆栈：可通过-Xss调整大小，内存不足时抛出Stack-OverflowError（纵向无法分配，即无法分配新的栈帧）或者OutOfMemoryError：unable to create new nativethread（横向无法分配，即无法建立新的线程）。   
+ + Socket缓存区：每个Socket连接都Receive和Send两个缓存区，分别占大约37KB和25KB内存，连接多的话这块内存占用也比较可观。如果无法分配，则可能会抛出IOEx-ception：Too many open files异常。   
+ + JNI代码：如果代码中使用JNI调用本地库，那本地库使用的内存也不在堆中。   
+ + 虚拟机和GC：虚拟机、GC的代码执行也要消耗一定的内存。
+ **解决办法：**
+通过-XX:MaxDirectMemorySize调整Direct Memory大小
+
+### 外部命令导致系统缓慢
+一个数字校园应用系统，运行在一台4个CPU的Solaris 10操作系统上，中间件为GlassFish服务器。系统在做大并发压力测试的时候，发现请求响应时间比较慢，通过操作系统的mpstat工具发现CPU使用率很高，并且系统占用绝大多数的CPU资源的程序并不是应用系统本身。这是个不正常的现象，通常情况下用户应用的CPU占用率应该占主要地位，才能说明系统是正常工作的。通过CPU检测，发现最消耗CPU资源的竟然是“fork”系统调用。原来每个用户请求的处理都需要执行一个外部shell脚本来获得系统的一些信息。执行这个shell脚本是通过Java的Run-time.getRuntime().exec()方法来调用的。
+ **问题分析：**
+“fork”系统调用是Linux用来产生新进程的，在Java虚拟机中，用户编写的Java代码最多只有线程的概念，不应当有进程的产生。Java的Run-time.getRuntime().exec()虽然可以实现需求，但是在Java虚拟机中是非常消耗资源的操作，即使外部命令本身能很快执行完毕，频繁调用时创建进程的开销也非常可观。Java虚拟机执行这个命令的过程是：首先克隆一个和当前虚拟机拥有一样环境变量的进程，再用这个新的进程去执行外部命令，最后再退出这个进程。如果频繁执行这个操作，系统的消耗会很大，不仅是CPU，内存负担也很重。
+ **解决办法：**
+用户根据建议去掉这个Shell脚本执行的语句，改为使用Java的API去获取这些信息后，系统很快恢复了正常。
+
+### 服务器JVM进程崩溃
+一个基于B/S的MIS系统，硬件为两台2个CPU、8GB内存的HP系统，服务器是WebLogic 9.2。正常运行一段时间后，最近发现在运行期间频繁出现集群节点的虚拟机进程自动关闭的现象，留下了一个hs_err_pid###.log文件后，进程就消失了，两台物理机器里的每个节点都出现过进程崩溃的现象。从系统日志中可以看出，每个节点的虚拟机进程在崩溃前不久，都发生过大量相同的异常，异常如下：
+
+```
+java.net.SocketException: Connection resetat java.net.SocketInputStream.read(SocketInputStream.java:168)at java.io.BufferedInputStream.fill(BufferedInputStream.java:218)at java.io.BufferedInputStream.read(BufferedInputStream.java:235)at org.apache.axis.transport.http.HTTPSender.readHeadersFromSocket(HTTPSender.java:583)at org.apache.axis.transport.http.HTTPSender.invoke(HTTPSender.java:143)... 99 more
+```
+通过系统管理员了解到系统最近与一个OA门户做了集成，在MIS系统工作流的待办事项变化时，要通过Web服务通知OA门户系统，把待办事项的变化同步到OA门户之中。通过SoapUI测试了一下同步待办事项的几个Web服务，发现调用后竟然需要长达3分钟才能返回，并且返回结果都是连接中断。由于MIS系统的用户多，待办事项变化很快，为了不被OA系统速度拖累，使用了异步的方式调用Web服务。
+ **问题分析：**
+这是一个远端断开连接的异常，由于两边服务速度的完全不对等，时间越长就累积了越多Web服务没有调用完成，导致在等待的线程和Socket连接越来越多，最终在超过虚拟机的承受能力后使得虚拟机进程崩溃。
+ **解决方法：**
+通知OA门户方修复无法使用的集成接口，并将异步调用改为生产者/消费者模式的消息队列实现后，系统恢复正常。
+
+### 不恰当数据结构导致内存占用过大
+后台RPC服务器，使用64位虚拟机，内存配置为-Xms4g-Xmx8g-Xmn1g，使用ParNew+CMS的收集器组合。平时对外服务的Minor GC时间约在30毫秒以内，完全可以接受。但业务上需要每10分钟加载一个约80MB的数据文件到内存进行数据分析，这些数据会在内存中形成超过100万个HashMap<Long,Long>Entry，在这段时间里面Minor GC就会造成超过500毫秒的停顿，对于这个停顿时间就接受不了了，具体情况如下面GC日志所示。
+
+```
+{Heap before GC invocations=95 (full 4):par new generation total 903168K, used 803142K [0x00002aaaae770000, 0x00002aaaebb70000, 0x00002aaaebb70000)eden space 802816K, 100% used [0x00002aaaae770000, 0x00002aaadf770000, 0x00002aaadf770000)from space 100352K, 0% used [0x00002aaae5970000, 0x00002aaae59c1910, 0x00002aaaebb70000)to space 100352K, 0% used [0x00002aaadf770000, 0x00002aaadf770000, 0x00002aaae5970000)concurrent mark-sweep generation total 5845540K, used 3898978K [0x00002aaaebb70000, 0x00002aac507f9000, 0x00002aacae770000)concurrent-mark-sweep perm gen total 65536K, used 40333K [0x00002aacae770000, 0x00002aacb2770000, 0x00002aacb2770000)2011-10-28T11:40:45.162+0800: 226.504: [GC 226.504: [ParNew: 803142K->100352K(903168K), 0.5995670 secs] 4702120K->4056332K(6748708K), 0.5997560secs] [Times: user=1.46 sys=0.04, real=0.60 secs]
+Heap after GC invocations=96 (full 4):par new generation total 903168K, used 100352K [0x00002aaaae770000, 0x00002aaaebb70000, 0x00002aaaebb70000)eden space 802816K, 0% used [0x00002aaaae770000, 0x00002aaaae770000, 0x00002aaadf770000)from space 100352K, 100% used [0x00002aaadf770000, 0x00002aaae5970000, 0x00002aaae5970000)to space 100352K, 0% used [0x00002aaae5970000, 0x00002aaae5970000, 0x00002aaaebb70000)concurrent mark-sweep generation total 5845540K, used 3955980K [0x00002aaaebb70000, 0x00002aac507f9000, 0x00002aacae770000)concurrent-mark-sweep perm gen total 65536K, used 40333K [0x00002aacae770000, 0x00002aacb2770000, 0x00002aacb2770000)}
+Total time for which application threads were stopped: 0.6070570 seconds
+```
+ **问题分析：**
+观察这个案例，发现平时的Minor GC时间很短，原因是新生代的绝大部分对象都是可清除的，在Minor GC之后Eden和Survivor基本上处于完全空闲的状态。而在分析数据文件期间，800MB的Eden空间很快被填满从而引发GC，但Minor GC之后，新生代中绝大部分对象依然是存活的。我们知道ParNew收集器使用的是复制算法，这个算法的高效是建立在大部分对象都“朝生夕灭”的特性上的，如果存活对象过多，把这些对象复制到Survivor并维持这些对象引用的正确就成为一个沉重的负担，导致GC停顿时间过长。
+问题产生的根本原因是用`HashMap<Long,Long>`结构来存储数据文件空间效率太低。
+在`HashMap<Long,Long>`结构中，只有Key和Value所存放的两个长整型数据是有效数据，共16B（2×8B）。这两个长整型数据包装成`java.lang.Long`对象之后，就分别具有8B的MarkWord、8B的Klass指针，在加8B存储数据的long值。在这两个Long对象组成Map.Entry之后，又多了16B的对象头，然后一个8B的next字段和4B的int型的hash字段，为了对齐，还必须添加4B的空白填充，最后还有HashMap中对这个Entry的8B的引用，这样增加两个长整型数字，实际耗费的内存为（Long（24B）×2）+Entry（32B）+HashMapRef（8B）=88B，空间效率为16B/88B=18%。
+ **解决办法：**
+可以实现自定义HashMap，不使用泛型，保存key、value的基本类型数据。
+
+### Windows虚拟内存导致的长时间停顿
+有一个带心跳检测功能的GUI桌面程序，每15秒会发送一次心跳检测信号，如果对方30秒以内都没有信号返回，那就认为和对方程序的连接已经断开。程序上线后发现心跳检测有误报的概率，查询日志发现误报的原因是程序会偶尔出现间隔约一分钟左右的时间完全无日志输出，处于停顿状态。因为是桌面程序，所需的内存并不大（-Xmx256m），所以开始并没有想到是GC导致的程序停顿，但是加入参数-XX:+Print-GCApplicationStoppedTime-XX：+PrintGCDateStamps-Xloggc：gclog.log后，从GC日志文件中确认了停顿确实是由GC导致的，大部分GC时间都控制在100毫秒以内，但偶尔就会出现一次接近1分钟的GC。
+
+```
+Total time for which application threads were stopped: 0.0112389 seconds
+Total time for which application threads were stopped: 0.0001335 seconds
+Total time for which application threads were stopped: 0.0003246 seconds
+Total time for which application threads were stopped: 41.4731411 seconds
+Total time for which application threads were stopped: 0.0489481 seconds
+```
+从GC日志中找到长时间停顿的具体日志信息（添加了-XX:+PrintReferenceGC参数），找到的日志片段如下所示。从日志中可以看出，真正执行GC动作的时间不是很长，但从准备开始GC，到真正开始GC之间所消耗的时间却占了绝大部分。
+
+```
+2012-08-29T19:14:30.968+0800: 10069.800: [GC10099.225: [SoftReference, 0 refs, 0.0000109 secs]10099.226: [WeakReference, 4072 refs, 0.0012099 secs]10099.227: [FinalReference, 984 refs, 1.5822450 secs]10100.809: [PhantomReference, 251 refs, 0.0001394 secs]10100.809: [JNI Weak Reference, 0.0994015 secs] [PSYoungGen: 175672K->8528K(167360K)] 251523K->100182K(353152K), 31.1580402 secs] [Times: user=0.61 sys=0.52, real=31.16 secs]
+```
+除GC日志之外，还观察到这个GUI程序内存变化的一个特点，当它最小化的时候，资源管理中显示的占用内存大幅度减小，但是虚拟内存则没有变化。
+ **问题分析：**
+问题时程序在最小化时它的工作内存被自动交换到磁盘的页面文件之中了，这样发生GC时就有可能因为恢复页面文件的操作而导致不正常的GC停顿。
+ **解决办法：**
+可以加入参数“-Dsun.awt.keep-WorkingSetOnMinimize=true”来解决，用于保证程序在恢复最小化时能够立即响应。
