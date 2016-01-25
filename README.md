@@ -1,5 +1,5 @@
 # My Blog
 
-#### website: brucechen13.gitub.io
+#### website:[github](http://brucechen13.gitub.io) 
 
-#### website: coderbruce.site
+#### website:[self web](http://www.coderbruce.site)
