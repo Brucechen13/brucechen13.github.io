@@ -1,0 +1,37 @@
+---
+layout:     post
+title:      "深入理解JAVA虚拟机学习笔记"
+subtitle:   "第9章 类加载及执行子系统的案例与实战"
+date:       2016-02-02
+author:     "brucechen"
+header-img: "img/post-bg-java.jpg"
+published: false
+tags:
+    - Java
+    - 读书笔记
+---
+
+### Tomcat:正统的类加载器架构
+一个功能健全的Web服务器，需要解决以下问题：
+* 部署在同一个服务器上的两个Web应用程序所使用的类库可以实现相互隔离。可能会同时依赖于第三方类库的不同版本，这时应保证两个程序的类库可以相互独立使用。
+* 部署在同一个服务器上的两个Web应用程序所使用的类库应当可以分享。如果应用程序所使用的类库版本一致，则没有必要各自独立使用，这只会增加类库使用的开销，浪费方法区的空间。
+* 服务器应该尽可能保证自身安全不受部署的Web程序影响。一般来说，服务器使用的类库应该与应用程序的类库相互独立。
+* 支持JSP应用的Web服务器，大多数需要支持HotSwap功能，当JSP文件修改时，不需要重启服务器就可以更新内容。
+
+为了满足上述需求，一般Web服务器都会提供好几个ClassPath路径供用户存放第三方类库，被放置在不同路径中的类库具备不同的访问范围和服务对象，每个目录都会有一个对应的自定义类加载器去加载里面的Java类库。
+Tomcat服务器有三种目录可以存放Java类库，部署的Web应用程序本身的`/WEB-INF/`目录也可以存放Java类库，各个目录的含义如下：
+* `/common`目录：类库可以被Tomcat和所有的Web应用程序使用
+* `/server`目录：只可以被Tomcat服务器使用
+* `/shared`目录：对所有Web应用程序可见，对Tomcat不可见
+* `/WebApp/WEB-INF`目录：类库仅仅可以被Web应用程序使用，对其他Web程序和服务器都不可见
+
+为了加载不同目录下的类库，Tomcat自定义了多个类加载器，按照经典的双亲委派模式来实现。
+
+![java-javascript](/img/in-post/java-virtual-machine/tomcat-classloader.jpg)
+<small class="img-hint">Tomcat服务器的类加载架构</small>
+
+`CommonClass-Loader`、`CatalinaClassLoader`、`SharedClassLoader`和`Webapp-ClassLoader`则是Tomcat自己定义的类加载器，它们分别加载`/common/*`、`/server/*`、`/shared/*`和`/WebApp/WEB-INF/*`中的Java类库。其中WebApp类加载器和Jsp类加载器通常会存在多个实例，每一个Web应用程序对应一个WebApp类加载器，每一个JSP文件对应一个Jsp类加载器。
+对于Tomcat的 **6.x** 以上 的版本，只有指定了tomcat/conf/catalina.properties配置文件的server.loader和share.loader项后才会真正建立CatalinaClassLoader和SharedClassLoader的实例，否则会用到这两个类加载器的地方都会用CommonClass-Loader的实例代替，而默认的配置文件中没有设置这两个loader项，所以Tomcat 6.x顺理成章地把/common、/server和/shared三个目录默认合并到一起变成一个/lib目录，这个目录里的类库相当于以前/common目录中类库的作用。这是Tomcat设计团队为了简化大多数的部署场景所做的一项改进，如果默认设置不能满足需要，用户可以通过修改配置文件指定server.loader和share.loader的方式重新启用Tomcat 5.x的加载器架构。
+
+### OSGi：灵活的类加载器架构
+OSGi（`Open Service Gateway Initiative`）是OSGi联盟制定的一个基于Java语言的动态模块化规范，OSGi中的每个模块（称为Bundle）与普通的Java类库区别并不太大，两者一般都以JAR格式进行封装，并且内部存储的都是Java Package和Class。但是一个Bundle可以声明它所依赖的Java Package（通过Import-Package描述），也可以声明它允许
