@@ -32,6 +32,102 @@ Tomcat服务器有三种目录可以存放Java类库，部署的Web应用程序�
 
 `CommonClass-Loader`、`CatalinaClassLoader`、`SharedClassLoader`和`Webapp-ClassLoader`则是Tomcat自己定义的类加载器，它们分别加载`/common/*`、`/server/*`、`/shared/*`和`/WebApp/WEB-INF/*`中的Java类库。其中WebApp类加载器和Jsp类加载器通常会存在多个实例，每一个Web应用程序对应一个WebApp类加载器，每一个JSP文件对应一个Jsp类加载器。
 对于Tomcat的 **6.x** 以上 的版本，只有指定了tomcat/conf/catalina.properties配置文件的server.loader和share.loader项后才会真正建立CatalinaClassLoader和SharedClassLoader的实例，否则会用到这两个类加载器的地方都会用CommonClass-Loader的实例代替，而默认的配置文件中没有设置这两个loader项，所以Tomcat 6.x顺理成章地把/common、/server和/shared三个目录默认合并到一起变成一个/lib目录，这个目录里的类库相当于以前/common目录中类库的作用。这是Tomcat设计团队为了简化大多数的部署场景所做的一项改进，如果默认设置不能满足需要，用户可以通过修改配置文件指定server.loader和share.loader的方式重新启用Tomcat 5.x的加载器架构。
+**Question**
+如果有10个Web应用程序都是用Spring来进行组织和管理的话，可以把Spring放到Common或Shared目录下让这些程序共享。Spring要对用户程序的类进行管理，自然要能访问到用户程序的类，而用户的程序显然是放在/WebApp/WEB-INF目录中的，那么被CommonClassLoader或SharedClassLoader加载的Spring如何访问并不在其加载范围内的用户程序呢？
+**Answer**
+
 
 ### OSGi：灵活的类加载器架构
-OSGi（`Open Service Gateway Initiative`）是OSGi联盟制定的一个基于Java语言的动态模块化规范，OSGi中的每个模块（称为Bundle）与普通的Java类库区别并不太大，两者一般都以JAR格式进行封装，并且内部存储的都是Java Package和Class。但是一个Bundle可以声明它所依赖的Java Package（通过Import-Package描述），也可以声明它允许
+OSGi（`Open Service Gateway Initiative`）是OSGi联盟制定的一个基于Java语言的动态模块化规范，OSGi中的每个模块（称为Bundle）与普通的Java类库区别并不太大，两者一般都以JAR格式进行封装，并且内部存储的都是Java Package和Class。但是一个Bundle可以声明它所依赖的Java Package（通过`Import-Package`描述），也可以声明它允许导出发布的Java Package（通过`Export-Package`描述）。在OSGi里面，Bundle之间的依赖关系从传统的上层模块依赖底层模块转变为 **平级模块之间的依赖** （至少外观上如此），而且类库的可见性能得到非常精确的控制，一个模块里只有被Export过的Package才可能由外界访问，其他的Package和Class将会隐藏起来。除了更精确的模块划分和可见性控制外，引入OSGi的另外一个重要理由是，基于OSGi的程序很可能（只是很可能，并不是一定会）可以实现 **模块级的热插拔功能** ，当程序升级更新或调试除错时，可以只停用、重新安装然后启用程序的其中一部分。
+OSGi独特的功能取决于灵活的类加载架构，Bundle之间类加载器只有规则，没有固定的委派关系。只有具体使用某个Package和Class的时候，才会根据Package导入导出定义来构造Bundle间的委派和依赖。只有定义在Export-Package列表中的类才可以被访问，否则，OSGi平台不会将类加载请求分配到这个类存在的Bundle中处理。
+OSGi中类加载可能进行的查找规则如下:
+* 以java.*开头的类，委派给父类加载器加载。   
+* 否则，委派列表名单内的类，委派给父类加载器加载。   
+* 否则，Import列表中的类，委派给Export这个类的Bun-dle的类加载器加载。   
+* 否则，查找当前Bundle的Classpath，使用自己的类加载器加载。   
+* 否则，查找是否在自己的Fragment Bundle中，如果是，则委派给Fragment Bundle的类加载器加载。   
+* 否则，查找Dynamic Import列表的Bundle，委派给对应Bundle的类加载器加载。   
+* 否则，类查找失败。
+
+OSGi灵活的类加载架构虽然可以实现很多功能，但也有可能产生一些问题，比如死锁：
+如果出现了Bun-dle A依赖Bundle B的Package B，而Bundle B又依赖了Bun-dle A的Package A，这两个Bundle进行类加载时就很容易发生死锁。具体情况是当Bundle A加载Package B的类时，首先需要锁定当前类加载器的实例对象（`java.lang.ClassLoader.load-Class()`是一个 **synchronized** 方法），然后把请求委派给BundleB的加载器处理，但如果这时候Bundle B也正好想加载PackageA的类，它也先锁定自己的加载器再去请求Bundle A的加载器处理，这样，两个加载器都在等待对方处理自己的请求，而对方处理完之前自己又一直处于同步锁定的状态，因此它们就互相死锁，永远无法完成加载请求了。
+解决方法是，用户可以启用`osgi.classloader.singleThreadLoads`参数来按单线程串行化的方式强制进行类加载动作。在JDK 1.7中，为非树状继承关系下的类加载器架构进行了一次 [专门的升级](http://openjdk.java.net/projects/jdk7/features/#f352) ，目的是从底层避免这类死锁出现的可能。
+
+### 字节码生成技术与动态代理的实现
+动态代理中所谓的“动态”，是针对使用Java代码实际编写了代理类的“静态”代理而言的，它的优势不在于省去了编写代理类那一点工作量，而是实现了可以在原始类和接口还未知的时候，就确定代理类的代理行为，当代理类与原始类脱离直接联系后，就可以很灵活地重用于不同的应用场景之中。
+动态代理的简单示例如下：
+```
+public class DynamicProxyTest {    
+	interface IHello {        
+		void sayHello();    
+	}    
+	static class Hello implements IHello {        
+		@Override        
+		public void sayHello() {            
+			System.out.println("hello world");        
+		}    
+	}    
+	static class DynamicProxy implements InvocationHandler {        
+		Object originalObj;        
+		Object bind(Object originalObj) {            
+		this.originalObj = originalObj;            
+			return Proxy.newProxyInstance(originalObj.getClass().getClassLoader(), originalObj.getClass().getInterfaces(), this);        
+		}        
+		@Override        
+		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {            
+			System.out.println("welcome");            
+			return method.invoke(originalObj, args);        
+		}    
+	}    
+	public static void main(String[] args) {        
+		IHello hello = (IHello) new DynamicProxy().bind(new Hello());        
+		hello.sayHello();    
+	}
+}
+```
+
+运行结果如下：
+```bash
+welcomehello 
+world
+```
+
+跟踪这个方法的源码，可以看到程序进行了验证、优化、缓存、同步、生成字节码、显式类加载等操作，前面的步骤并不是我们关注的重点，而最后它调用了`sun.misc.ProxyGenerator.gener-ateProxyClass()`方法来完成生成字节码的动作，这个方法可以在运行时产生一个描述代理类的字节码byte[]数组。如果想看一看这个在运行时产生的代理类中写了些什么，可以在main()方法中加入下面这句：`System.getProperties().put("sun.misc.ProxyGenerator.saveGeneratedFiles", "true");`，加入这句代码后再次运行程序，磁盘中将会产生一个名为`$Proxy0.class`的代理类Class文件，反编译后代码如下：
+```
+package org.fenixsoft.bytecode;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.UndeclaredThrowableException;
+public final class $Proxy0 extends Proxy implements DynamicProxyTest.IHello {    
+	private static Method m3;    
+	private static Method m1;    
+	private static Method m0;    
+	private static Method m2;    
+	public $Proxy0(InvocationHandler paramInvocationHandler) {
+	super(paramInvocationHandler);    
+	}    
+	public final void sayHello() {        
+		try{            
+			this.h.invoke(this, m3, null);//h是父类Proxy中保存的InvocationHandler实例变量         
+			return;        
+		} catch (RuntimeException localRuntimeException) {            
+			throw localRuntimeException;        
+		} catch (Throwable localThrowable) {            
+			throw new UndeclaredThrowableException(localThrowable);        
+		}    
+	}// 省略equals()、hashCode()、toString()三个方法的代码   
+	static{        
+		try {            
+			m3 = Class.forName("org.fenixsoft.bytecode.DynamicProxyTest$IHello").getMethod("sayHello", new Class[0]);            
+			m1 = Class.forName("java.lang.Object").getMethod("equals", new Class[] { Class.forName("java.lang.Object") });            
+			m0 = Class.forName("java.lang.Object").getMethod("hashCode", new Class[0]);            
+			m2 = Class.forName("java.lang.Object").getMethod("toString", new Class[0]);            
+			return;        
+		} catch (NoSuchMethodException localNoSuchMethodException) {            
+			throw new NoSuchMethodError(localNoSuchMethodException.getMessage());        
+		} catch (ClassNotFoundException localClassNotFoundException) {            
+			throw new NoClassDefFoundError(localClassNotFoundException.getMessage());        
+		}    
+	}
+}
