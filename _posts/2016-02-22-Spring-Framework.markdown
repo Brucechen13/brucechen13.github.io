@@ -73,8 +73,195 @@ Web层包括`spring-web,spring-webmvc,spring-websocket,spring-webmvc-portlet`模
 `spring-webmvc-portlet`模块(Web-Portlet模块)提供了用于Portlet环境和`spring-webmvc`模块的MVC实现。
 2.2.6 Test
 `spring-test`模块支持JUnit或TestNG关于Spring组件的单元测试和集成测试。它提供Spring应用上下文的持久化引用并缓存这些上下文。也提供模拟对象可以独立的测试你的代码。
+2.3 使用场景
+上述的构造图展示Spring可以适用于很多场景，通过使用Spring实用的事务管理和web整合框架，既可以应用于资源有限的嵌入式应用，也可以引用在成熟的企业应用。
+
+![java-javascript](/img/in-post/spring/overview-full.png.png)
+<small class="img-hint">Typical full-fledged Spring web application</small>
+
+Spring的声明式事务管理功能使得web程序可以像使用EJB容器管理事务的一样完全事务性。所有的事务逻辑可以被简单的POJO实现并被Spring的IoC容器管理。对于邮件发送和数据验证支持的额外服务由web层提供，可以让你选择怎样执行验证规则。Spring的ORM支持可以和JPA，Hibernate和JDO整合。例如，当使用Hibernate，你可以继续使用你的映射文件和标准的Hibernate`SessionFactory`配置。控制器无缝衔接web层和模型层，移除了`ActionForms`和其他用于传输HTTP参数到模型层的需要。
 
 ### Spring Framework4新功能
+#### Spring 4.0增强和新功能
+Spring框架第一个版本发布于2004年，自发布以来已历经三个主要版本更新:Spring 2.0提供了XML命名空间和AspectJ支持；Spring 2.5增加了注释驱动（annotation-driven）的配置支持；Spring 3.0增加了对Java 5+版本的支持和@Configuration模型。
+Spring 4.0是最新的主要版本，并且首次完全支持Java 8的特性。你仍然可以使用老版本的Java，但是最低版本的要求已经提高到Java SE 6。我们也借主要版本更新的机会删除了许多过时的类和方法。
+你可以在 [Spring Wiki文档](https://github.com/spring-projects/spring-framework/wiki) 上查看 [升级Spring 4.0迁移指南](https://github.com/spring-projects/spring-framework/wiki/Migrating-from-earlier-versions-of-the-spring-framework)。
+3.1 改进的入门体验
+新的 spring.io 网站提供了一整个系列的 "入门指南" 帮助你学习Spring。你可以本文档的 Spring 入门概述 一节阅读更多的入门指南。新网站还提供了Spring之下其他额外项目的一个全面的概述。
+如果你是一个Maven用户，你可能会对 BOM 这个有用的POM文件感兴趣， 这个文件已经与每个Spring的发布版发布。
+3.2 移除过时的包和方法
+所有过时的包和许多过时的类和方法已经从Spring4中移除。如果你从之前的发布版升级Spring，你需要保证已经修复了所有使用过时的API方法。
+
+查看完整的变化： [API差异报告](http://docs.spring.io/spring-framework/docs/3.2.4.RELEASE_to_4.0.0.RELEASE/)。
+
+请注意，所有可选的第三方依赖都已经升级到了最低2010/2011(例如Spring4通常只支持2010年的最新或者现在的最新发布版本):尤其是 Hibernate 3.6+、EhCache 2.1+、Quartz 1.8+、Groovy 1.8+、Joda-Time 2.0+。但是有一个例外，Spring4依赖最近的Hibernate Validator 4.3+，现在对Jackson的支持集中在2.0+版本 (Spring3.2支持的Jackson 1.8/1.9，现在已经过时）。
+3.3 Java 8 (以及6和7)
+Spring4支持Java8的一些特性。你可以在Spring的回调接口中使用 lambda 表达式 和 方法引用。支持java.time (JSR-310)的值类型和一些改进过的注解，例如@Repeatable。你还可以使用Java8的参数名称发现机制（基于-parameters编译器标志）。
+
+Spring仍然兼容老版本的Java和JDK：Java SE 6（具体来说，支持JDK6 update 18）以上版本，我们建议新的基于Spring4的项目使用Java7或Java8。
+3.4 Java EE 6和7
+Java EE 6 或以上版本是Spring4的底线,与JPA2.0和Servlet3.0规范有着特殊的意义。为了保持与Google App Engine和旧的应用程序服务器兼容,Spring4可以部署在Servlet2.5运行环境。但是我们强烈的建议您在Spring测试和模拟测试的开发环境中使用Servlet3.0+。
+`如果你是WebSphere 7的用户，一定要安装JPA2.0功能包。在WebLogic 10.3.4或更高版本，安装附带的JPA2.0补丁。这样就可以将这两种服务器变成Spring4兼容的部署环境。`
+
+从长远的观点来看，Spring4.0现在支持Java EE 7级别的适用性规范：尤其是JMS 2.0, JTA 1.2, JPA 2.1, Bean Validation 1.1 和JSR-236并发工具类。像往常一样，支持的重点是独立的使用这些规范。例如在Tomcat或者独立环境中。但是，当把Spring应用部署到Java EE 7服务器时它同样适用。
+
+注意，Hibernate 4.3是JPA 2.1的提供者，因此它只支持Spring4。同样适用用于作为Bean Validation 1.1提供者的Hibernate Validator 5.0。这两个都不支持Spring3.2。
+3.5 Groovy DSL定义Bean
+
+Spring4.0支持使用Groovy DSL来进行外部的bean定义配置。这在概念上类似于使用XML的bean定义，但是支持更简洁的语法。使用Groovy还允许您轻松地将bean定义直接嵌入到引导代码中。例如：
+```
+def reader = new GroovyBeanDefinitionReader(myApplicationContext)
+reader.beans {
+    dataSource(BasicDataSource) {
+        driverClassName = "org.hsqldb.jdbcDriver"
+        url = "jdbc:hsqldb:mem:grailsDB"
+        username = "sa"
+        password = ""
+        settings = [mynew:"setting"]
+    }
+    sessionFactory(SessionFactory) {
+        dataSource = dataSource
+    }
+    myService(MyService) {
+        nestedBean = { AnotherBean bean ->
+            dataSource = dataSource
+        }
+    }
+}
+```
+有关更多信息，请参阅 GroovyBeanDefinitionReader javadocs.
+3.6 核心容器改进
+
+有几种对核心容器的常规改进：
+
+* Spring现在注入Bean的时候把 泛型类型 当成一种形式的 限定符。例如：如果你使用Spring Data Repository你可以方便的插入特定的实现：@Autowired Repository<Customer> customerRepository。
+* 如果你使用Spring的元注解支持，你现在可以开发自定义注解来公开源注解的特定属性。
+* 当自动装配到lists和arrays时，Beans现在可以被 排序 了。支持@Order注解和Ordered接口两种方式。
+* @Lazy注解现在可以用在注入点以及@Bean定义上。
+* 引入@Description注解,开发人员可以使用基于Java方式的配置。
+* 根据条件筛选Beans的广义模型通过@Conditional注解加入。这和@Profile支持的类似，但是允许以编程式开发用户定义的策略。
+* 基于CGLIB的代理类不在需要默认的构造方法。这个支持是由 objenesis库提供。这个库重新打包到Spring框架中，作为Spring框架的一部分发布。通过这个策略，针对代理实例被调用没有构造可言了。
+* 框架现在支持管理时区。例如LocaleContext。 
+
+3.7 常规Web改进
+
+现在仍然可以部署到Servlet 2.5服务器，但是Spring4.0现在主要集中在Servlet 3.0+环境。如果你使用Spring MVC测试框架，你需要将Servlet 3.0兼容的JAR包放到 测试的classpath下。
+
+除了稍后会提到的WebSocket支持外，下面的常规改进已经加入到Spring的Web模块：
+
+    你可以在Spring MVC应用中使用新的@RestController注解，不在需要给@RequestMapping的方法添加@ResponseBody注解。
+    AsyncRestTemplate类已被添加进来，当开发REST客户端时，允许非阻塞异步支持。
+    当开发Spring MVC应用时，Spring现在提供了全面的时区支持 。 
+
+3.8 WebSocket、SockJS和STOMP消息
+
+一个新的spring-websocket模块提供了全面的基于WebSocket和在Web应用的客户端和服务器之间双向通信的支持。它和Java WebSocket API JSR-356兼容，此外还提供了当浏览器不支持WebSocket协议时的基于SockJS的备用选项。
+
+一个新的spring-messaging模块添加了支持STOMP作为WebSocket子协议用于在应用中使用注解编程模型路由和处理从WebSocket客户端发送的STOMP消息。由于@Controller现在可以同时包含@RequestMapping和@MessageMapping方法用于处理HTTP请求和来自WebSocket连接客户端发送的消息。新的spring-messaging模块还包含了来自以前Spring集成项目的关键抽象，例如Message、MessageChannel、MessageHandler和其他作为基于消息传递的应用程序的基础。
+
+欲知详情以及较全面的介绍，请参见Chapter 20, WebSocket 支持一节。
+3.9 测试改进
+
+除了精简spring-test模块中过时的代码外，Spring4还引入了几个用于单元测试和集成测试的新功能。
+
+    几乎spring-test模块中所有的注解（例如：@ContextConfiguration、@WebAppConfiguration、@ContextHierarchy、@ActiveProfiles等等)现在可以用作元注解来创建自定义的composed annotations并且可以减少测试套件的配置。
+    现在可以以编程方式解决Bean定义配置文件的激活。只需要实现一个自定义的ActiveProfilesResolver，并且通过@ActiveProfiles的resolver属性注册。
+    新的SocketUtils类被引入到了spring-core模块。这个类可以使你能够扫描本地主机的空闲的TCP和UDP服务端口。这个功能不是专门用在测试的，但是可以证明在你使用Socket写集成测试的时候非常有用。例如测试内存中启动的SMTP服务器，FTP服务器，Servlet容器等。
+    从Spring 4.0开始,org.springframework.mock.web包中的一套mock是基于Servlet 3.0 API。此外，一些Servlet API mocks（例如：MockHttpServletRequest、MockServletContext等等）已经有一些小的改进更新，提高了可配置性。 
+4. Spring 4.1增强和新功能
+Prev 	Part II. Spring 4.x的新功能	 Next
+4. Spring 4.1增强和新功能
+4.1 JMS改进
+
+Spring 4.1引入了一个更简单的基础架构，使用 @JmsListener注解bean方法来注册JMS监听端点。XML命名空间已经通过增强来支持这种新的方式（jms:annotation-driven），它也可以完全通过Java配置( @EnableJms, JmsListenerContainerFactory)来配置架构。也可以使用 JmsListenerConfigurer注解来注册监听端点。
+
+Spring 4.1还调整了JMS的支持，使得你可以从spring-messaging在Spring4.0引入的抽象获益，即：
+
+    消息监听端点可以有更为灵活的签名，并且可以从标准的消息注解获益，例如@Payload、@Header、@Headers和@SendTo注解。另外，也可以使用一个标准的消息，以代替javax.jms.Message作为方法参数。
+    一个新的可用 JmsMessageOperations接口和允许操作使用Message抽象的JmsTemplate。 
+
+最后，Spring 4.1提供了其他各种各样的改进：
+
+    JmsTemplate中的同步请求-答复操作支持
+    监听器的优先权可以指定每个<jms:listener/>元素
+    消息侦听器容器恢复选项可以通过使用 BackOff 实现进行配置
+    JMS 2.0消费者支持共享 
+
+4.2 Caching（缓存）改进
+
+Spring 4.1 支持JCache (JSR-107)注解使用Spring的现有缓存配置和基础结构的抽象；使用标准注解不需要任何更改。
+
+Spring 4.1也大大提高了自己的缓存抽象：
+
+    缓存可以在运行时使用CacheResolver解决。因此使用value参数定义的缓存名称不在是强制性的。
+    更多的操作级自定义项：缓存解析器，缓存管理器，键值生成器
+    一个新的@CacheConfig类级别注解允许在类级别上共享常用配置，不需要启用任何缓存操作。
+    使用CacheErrorHandler更好的处理缓存方法的异常 
+
+Spring 4.1为了在CacheInterface添加一个新的putIfAbsent方法也做了重大的更改。
+4.3 Web改进
+
+    The existing support for resource handling based on the ResourceHttpRequestHandler has been expanded with new abstractions ResourceResolver, ResourceTransformer, and ResourceUrlProvider. A number of built-in implementations provide support for versioned resource URLs (for effective HTTP caching), locating gzipped resources, generating an HTML 5 AppCache manifests, and more. See Section 16.16.7, “Serving of Resources”.
+    JDK 1.8’s java.util.Optional is now supported for @RequestParam, @RequestHeader, and @MatrixVariable controller method arguments.
+    ListenableFuture is supported as a return value alternative to DeferredResult where an underlying service (or perhaps a call to AsyncRestTemplate) already returns ListenableFuture.
+    @ModelAttribute methods are now invoked in an order that respects inter-dependencies. See SPR-6299.
+    Jackson’s @JsonView is supported directly on @ResponseBody and ResponseEntity controller methods for serializing different amounts of detail for the same POJO (e.g. summary vs. detail page). This is also supported with View-based rendering by adding the serialization view type as a model attribute under a special key. See the section called “支持 Jackson 序列化视图” for details.
+    JSONP is now supported with Jackson. See the section called “支持 Jackson JSONP”.
+    A new lifecycle option is available for intercepting @ResponseBody and ResponseEntity methods just after the controller method returns and before the response is written. To take advantage declare an @ControllerAdvice bean that implements ResponseBodyAdvice. The built-in support for @JsonView and JSONP take advantage of this. See Section 16.4.1, “使用 HandlerInterceptor 拦截请求”.
+
+    There are three new HttpMessageConverter options:
+        Gson — lighter footprint than Jackson; has already been in use in Spring Android.
+        Google Protocol Buffers — efficient and effective as an inter-service communication data protocol within an enterprise but can also be exposed as JSON and XML for browsers.
+        Jackson based XML serialization is now supported through the jackson-dataformat-xml extension. When using @EnableWebMvc or <mvc:annotation-driven/>, this is used by default instead of JAXB2 if jackson-dataformat-xml is in the classpath. 
+    Views such as JSPs can now build links to controllers by referring to controller mappings by name. A default name is assigned to every @RequestMapping. For example FooController with method handleFoo is named "FC#handleFoo". The naming strategy is pluggable. It is also possible to name an @RequestMapping explicitly through its name attribute. A new mvcUrl function in the Spring JSP tag library makes this easy to use in JSP pages. See Section 16.7.2, “Building URIs to Controllers and methods from views”.
+    ResponseEntity provides a builder-style API to guide controller methods towards the preparation of server-side responses, e.g. ResponseEntity.ok().
+    RequestEntity is a new type that provides a builder-style API to guide client-side REST code towards the preparation of HTTP requests.
+
+    MVC Java config and XML namespace:
+        View resolvers can now be configured including support for content negotiation, see Section 16.16.6, “View Resolvers”.
+        View controllers now have built-in support for redirects and for setting the response status. An application can use this to configure redirect URLs, render 404 responses with a view, send "no content" responses, etc. Some use cases are listed here.
+        Path matching customizations are frequently used and now built-in. See Section 16.16.9, “Path Matching”. 
+    Groovy markup template support (based on Groovy 2.3). See the GroovyMarkupConfigurer and respecitve ViewResolver and ‘View’ implementations. 
+
+4.4 WebSocket STOMP消息改进
+
+    SockJS (Java) client-side support. See SockJsClient and classes in same package.
+    New application context events SessionSubscribeEvent and SessionUnubscribeEvent published when STOMP clients subscribe and unsubscribe.
+    New "websocket" scope. See Section 20.4.13, “WebSocket Scope”.
+    @SendToUser can target only a single session and does not require an authenticated user.
+    @MessageMapping methods can use dot "." instead of slash "/" as path separator. See SPR-11660.
+    STOMP/WebSocket monitoring info collected and logged. See Section 20.4.15, “Runtime Monitoring”.
+    Significantly optimized and improved logging that should remain very readable and compact even at DEBUG level.
+    Optimized message creation including support for temporary message mutability and avoiding automatic message id and timestamp creation. See Javadoc of MessageHeaderAccessor.
+    STOMP/WebSocket connections that have not activity 60 seconds after the WebSocket session is established. See SPR-11884. 
+
+4.5 测试改进
+
+    Groovy scripts can now be used to configure the ApplicationContext loaded for integration tests in the TestContext framework.
+        See the section called “Context configuration with Groovy scripts” for details. 
+
+    Test-managed transactions can now be programmatically started and ended within transactional test methods via the new TestTransaction API.
+        See the section called “Programmatic transaction management” for details. 
+
+    SQL script execution can now be configured declaratively via the new @Sql and @SqlConfig annotations on a per-class or per-method basis.
+        See the section called “Executing SQL scripts” for details. 
+
+    Test property sources which automatically override system and application property sources can be configured via the new @TestPropertySource annotation.
+        See the section called “Context configuration with test property sources” for details. 
+
+    Default TestExecutionListeners can now be automatically discovered.
+        See the section called “Automatic discovery of default TestExecutionListeners” for details. 
+
+    Custom TestExecutionListeners can now be automatically merged with the default listeners.
+        See the section called “Merging TestExecutionListeners” for details. 
+
+    The documentation for transactional testing support in the TestContext framework has been improved with more thorough explanations and additional examples.
+        See the section called “Transaction management” for details. 
+    Various improvements to MockServletContext, MockHttpServletRequest, and other Servlet API mocks.
+    AssertThrows has been refactored to support Throwable instead of Exception.
+    In Spring MVC Test, JSON responses can be asserted with JSON Assert as an extra option to using JSONPath much like it has been possible to do for XML with XMLUnit.
+    MockMvcBuilder recipes can now be created with the help of MockMvcConfigurer. This was added to make it easy to apply Spring Security setup but can be used to encapsulate common setup for any 3rd party framework or within a project.
+    MockRestServiceServer now supports the AsyncRestTemplate for client-side testing.
 
 ### 核心技术
 
