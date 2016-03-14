@@ -80,6 +80,34 @@ Web层包括`spring-web,spring-webmvc,spring-websocket,spring-webmvc-portlet`模
 <small class="img-hint">Typical full-fledged Spring web application</small>
 
 Spring的声明式事务管理功能使得web程序可以像使用EJB容器管理事务的一样完全事务性。所有的事务逻辑可以被简单的POJO实现并被Spring的IoC容器管理。对于邮件发送和数据验证支持的额外服务由web层提供，可以让你选择怎样执行验证规则。Spring的ORM支持可以和JPA，Hibernate和JDO整合。例如，当使用Hibernate，你可以继续使用你的映射文件和标准的Hibernate`SessionFactory`配置。控制器无缝衔接web层和模型层，移除了`ActionForms`和其他用于传输HTTP参数到模型层的需要。
+2.3.1 依赖管理和命名约定
+依赖管理不同于依赖注入，为了在你的项目中使用诸如依赖注入这样的Spring功能，你需要装配所有需要的库并在运行时或者编译时把这些库放入classpath中。这些依赖并不是被注入的虚拟组件，而是文件系统中的物理资源。依赖管理的过程包括定位这些资源，载入并添加到classpath中。依赖可以是直接的（比如我的项目在运行时直接依赖Spring），也可以是间接的（比如我的项目依赖`commons-dbcp`，它依赖于`commons-pool`）。间接依赖也被称为传递，这也是所有依赖中最难鉴别和管理的。
+如果你将使用Spring，你需要赋值你所需要的Spring组件到jar库中。为了让这个步骤更加容易，Spring被打包成一系列将依赖尽可能分割的模块，比如如果你不想实现web应用，你就不需要`spring-web`模块。为了表示Spring库的模块，我们使用一个速记的命名约定`spring-*`或`spring-*.jar`，`*`代表模块的名字（如`spring-core、spring-mvc、spring-jms`）。你使用的实际jar文件名字通常是模块名加上版本号（如`spring-core-4.3.0.BUILD-SNAPSHOT.jar`）。
+每个Spring框架的正式版都会发布组件到以下位置：
+* Maven Central，Maven请求的默认库，并不需要其他特殊的配置。很多Spring依赖的常用库也可以从Maven Central找到。而且很大一部分Spring社区用户使用Maven来管理依赖，这对他们来说很便捷。这里的jar是以`spring-*-<Version>.jar`的形式命名的，对应的Maven组id则是`org.springframework`。
+* 专门用于托管Spring的公用Maven库。除了最终的GA正式版，这个库也托管开发快照版
+和里程碑版。jar文件的命名规则和Maven Central是一致的，所以这是一个获取Spring开发版本和其他在Maven Central的库配合使用的地方。为了更容易被下载，这个库
+还包含打包了所有Spring的jar文件的分发zip文件。
+因此，你需要决定的第一件事就是如何管理你的依赖，我们一般推荐使用自动管理系统，如Maven，Gradle或lvy，但是你也可以下载这些jars文件人工管理。
+
+##### Spring依赖和Spring的依赖
+尽管Spring为众多的企业级和其他额外工具提供了集成和支持。她还是有意识的保持她的
+强制依赖尽可能少。仅用Spring来构建简单的使用案例，您不应当去定位大量的jar库并下载（即使是自动的）。基本的依赖注入只需要一个额外的强制依赖用于日志管理（后面会更加详细的介绍日志选项）。接着我们会描绘配置一个依赖Spring的应用所应遵循的基本步骤，依次会涉及到Maven，Gradle和Ivy。所有案例里，如果有任何不清楚的，参考您的依赖管理系统相对应的文档，或者看一些示例代码。Spring编译时，是用Gradle来管理依赖的，我们的示例大部分使用Gadle或者Maven。
+
+##### Maven依赖管理
+如果您使用Maven来管理依赖，您甚至不需要显式提供日志依赖。比方说，创建一个应用上下并使用依赖注入去配置一个应用，你的Maven依赖应该如下：
+
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-context</artifactId>
+        <version>4.3.0.BUILD-SNAPSHOT</version>
+        <scope>runtime</scope>
+    </dependency>
+</dependencies>
+```
+
 
 ### Spring Framework4新功能
 #### Spring 4.0增强和新功能
