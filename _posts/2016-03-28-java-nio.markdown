@@ -1,0 +1,62 @@
+---
+layout:     post
+title:      "Java NIO笔记"
+subtitle:   ""
+date:       2016-03-28
+author:     "brucechen"
+header-img: "img/post-bg-java.jpg"
+published: false
+tags:
+    - Java
+    - 读书笔记
+---
+
+### 核心部分
+Java NIO由以下几个核心部分组成：
+* Channels，类似于IO中的IO流，数据从Chanel读到Buffer，也可以从Buffer写到Chanel中，但流的读写是单向的。而且Chanel可以异步读写。通道中的数据总是要先读到Buffer，或者从Buffer写入。
+常用Chanel实现有：
+ + FileChanel
+ + DatagramChanel
+ + SocketChanel
+ + ServerSocketChanel
+下面是一个使用FileChanel读取数据到Buffer的例子：
+```
+RandomAccessFile aFile = new RandomAccessFile("data/nio_data.txt", rw);
+FileChanel inChanel = aFile.getChanel();
+ByteBuffer buf = ByteBuffer.aloocate(48);
+int bytesRead = inChanel.read(buf);
+while(bytesRead != -1){
+	buf.flip();
+	while(buf.hasRemaining()){
+		buf.get();
+	}
+buf.clear();
+bytesRead = inChanel.read(buf);
+}
+aFile.close();
+```
+* Buffers，本质是一块可以写入数据然后从中读取的内存，这块内存被包装成NIO Buffer对象，用于方便访问内存，常用的实现有：
+ + ByteBuffer
+ + CharBuffer
+ + DoubleBuffer
+ + FloatBuffer
+ + IntBuffer
+ + LongBuffer
+ + ShortBuffer
+向buffer写入数据时，会记录写入了多少数据，当需要读取数据时，通过flip()方法将Buffer从写模式切换到读模式，读取写入到Buffer的所有数据。一旦读完所有数据，需要调用clear()或compact()方法清空缓冲区。
+作为内存块，Buffer可以容纳的数据是有限的，Buffer的内存容量是一个固定值capcity，一旦Buffer满了，需要将其清空才能继续写入数据。
+当写入数据时，Position表示当前的位置，默认为0,写入数据后下移，最大值为capacity-1。
+当读取数据时，也是从特定位置开始读，当从写模式切换到读模式时，position会被重置为0.当从Buffer的position处读取数据时，position下移。
+当切换到Buffer的读模式时，当前的position会存储到limit中，表示可读的最多数据，写模式limit等于capacity。
+
+* Selectors，Selectro允许单线程处理多个Chanel，如果应用中打开了多个连接，但每个连接数据量比较少，可以使用Selector。使用Selector需要首先向Selector注册Chanel，然后调用select()方法，这个方法会一直阻塞到某个注册的通道有事件就绪。
+
+### NIO和IO的区别
+#### 面向流和面向缓冲
+Java IO时面向流的，除非把数据全部读到缓冲区中，否则是没有办法随意操作流数据。Java NIO则是首先把数据读取到一个稍后处理的缓冲区，需要时可以在缓冲区前后移动。
+
+##### 阻塞和非阻塞IO
+这是NIO最重要的特点，不同于IO是阻塞的，线程在调用read()或write()时，必须等待数据读取或写入，Java NIO采用非阻塞模式，使一个线程从通道发送请求读取数据，如果当前没有数据则不获取而不是阻塞线程。
+
+#### 选择器
+Java NIO的选择器允许一个单独的线程来监视多个输入通道，你可以注册多个通道使用一个选择器，然后使用一个单独的线程来 **选择** 通道：这些通道里已经有可以处理的输入，或者选择已准备写入的通道。这种选择机制，使得一个单独的线程很容易来管理多个通道。

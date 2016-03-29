@@ -107,11 +107,211 @@ Spring的声明式事务管理功能使得web程序可以像使用EJB容器管�
     </dependency>
 </dependencies>
 ```
+注意scope被声明为runtime所以你不需要跟Spring API一起编译。这就是基本的依赖注入案例。
+上面的例子使用的Maven Central库，当要使用Spring Maven库（比如使用里程碑版的或
+者开发快照版的），您需要在您的Maven配置里指定Maven库位置。正式版配置如下：
+```
+<repositories>
+    <repository>
+        <id>io.spring.repo.maven.release</id>
+        <url>http://repo.spring.io/release/</url>
+        <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+</repositories>
+```
+里程碑版：
+```
+<repositories>
+    <repository>
+        <id>io.spring.repo.maven.milestone</id>
+        <url>http://repo.spring.io/milestone/</url>
+        <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+</repositories>
+```
+快照版：
+```
+<repositories>
+    <repository>
+        <id>io.spring.repo.maven.snapshot</id>
+        <url>http://repo.spring.io/snapshot/</url>
+        <snapshots><enabled>true</enabled></snapshots>
+    </repository>
+</repositories>
+```
+##### Maven“物料清单”依赖
+当使用Maven时，有可能会混淆Spring的jar库的不同版本。比方说，您可能寻找一个第三方库，或者另一个Spring项目，刚好依赖传递到一个较旧的正式版。如果您忘记显式声明一个直接依赖，可能会发生种种无法预料的问题。
+为了解决这类问题，Maven支持“物料清单”（BOM）依赖的概念。您可以在`dependencyManagement`节点导入`spring-framework-bom`来保证所有Spring的依赖（无论是直接还是传递的）都采用了同样的版本。
+```
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-framework-bom</artifactId>
+            <version>4.3.0.BUILD-SNAPSHOT</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+使用BOM的额外好处是，当依赖于Spring框架工件时，您不需要再指定<version>属性。
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-context</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-web</artifactId>
+    </dependency>
+<dependencies>
+```
+
+##### Gradle依赖管理
+为了通过Gradle构建系统使用Spring库，需要将合适的URL添加到`repositories`节点中。
+```
+repositories {
+    mavenCentral()
+    // and optionally...
+    maven { url "http://repo.spring.io/release" }
+}
+```
+您可以根据需要选择`repositories `URL的值，可以使`/release`，`/milestone`，`/shapshot`。一旦配置好一个库，您就可以通过Gradle的常规方式来声明依赖了。
+```
+dependencies {
+    compile("org.springframework:spring-context:4.3.0.BUILD-SNAPSHOT")
+    testCompile("org.springframework:spring-test:4.3.0.BUILD-SNAPSHOT")
+}
+```
+
+##### Ivy依赖管理
+假如您更喜欢使用Ivy来管理依赖，也存在类似的配置选项。需要在您的ivysettings.xml增加下面的解析器来配置Ivy指向的Spring库。
+```
+<resolvers>
+    <ibiblio name="io.spring.repo.maven.release"
+            m2compatible="true"
+            root="http://repo.spring.io/release/"/>
+</resolvers>
+```
+您可以从`/release/`，`/milestone/`，`/snapshot/`中选择一个合适的来改变根URL。一旦配置好，您就能以一般的方式来增加依赖了。譬如（在ivy.xml里）：
+```
+<dependency org="org.springframework"
+    name="spring-core" rev="4.3.0.BUILD-SNAPSHOT" conf="compile->runtime"/>
+```
+
+##### 分发的Zip文件
+尽管使用依赖管理的构建系统是获取Spring框架的推荐方式，依然可以下载一个分发的zip文件。
+zip文件发布在Spring的Maven库（只是为了下载方便，你可以通过其他途径下载）。
+要下载一个分发的zip文件，需要在web浏览器打开[http://repo.spring.io/release/org/springframework/spring](http://repo.spring.io/release/org/springframework/spring)， 选择一个合适的版本目录。分发zip文件是以`-dist.zip`结尾的，如spring-framework-4.0.0.RELEASE-dist.zip。里程碑版
+和快照版同样也发布了分发包。
+
+2.3.2 日志系统
+日志是Spring一个非常重要的依赖。因为 a) 它是唯一强制的外部依赖，b) 每个人都喜欢看到他们所使用工具的输出信息，c) Spring集成了许多其他同样也选择了日志依赖的工具。应用开发者的诉求之一是想要拥有一个 **能在核心位置给整个应用包括所有的外部组件提供统一配置的日志** 。而自从有了太多的日志框架可供选择以后，这一点变得更加困难。
+Spring强制的日志依赖是Jakarta Commons Logging API（JCL）。我们编译时依赖JCL，我们同时创建了那些JCL `Log`对象，这些对象对继承了Spring框架的类是可见的。Spring所有版本使用了相同的日志库，这对用户很重要：由于维持了向前兼容，使得易于迁移，对那些继承于Spring的应用也是这样。我们处理兼容性的方法，是把Spring的模块之一显式依赖于`commons-logging`（JCL的标准实现）并在编译时把它作为其他模块的依赖。假设您使用Maven，想知道哪里依赖了`commons-logging`，那么就会发现是Spring，具体来说是那个叫做`spring-core`的核心模块。
+`commons-logging`很赞的地方是，您不需要任何额外的东西就能使您的应用运行起来。它内置了一个运行时侦测算法：在类路径里众所周知的位置寻找其他日志框架，使用那个它认为合适的（或者如果您需要的话，您也可以给它设置一个）。假如找不到任何日志框架，您将从JDK（java.util.logging或者简称JUL）获得相当美观的日志。这时您应该就会看到您的Spring应用运行起来了，并且在大多数情况下日志信息立刻会愉快的出现在控制台上，而这对您来说恰恰是重要的。
+
+##### 不要使用Commons Logging
+不幸的是，内置在`commons-logging`的运行时侦测算法是有问题的，尽管对终端用户来说很实用。如果我们能让时间回到过去，立刻开展一个叫做Spring的新工程，Spring将会使用不同的日志依赖。首选可能就是Simple Logging Facade for Java（SLF4J），与Spring一起被人们广泛使用的其他工具在自己的应用中也采用了它。
+有两种基本的方法去切换掉`commons-logging`:
+1. 扩展`spring-core`模块的依赖（也是`commons-logging`显式依赖的唯一模块）
+2. 依赖具体的`commons-logging`并且使用空jar文件替换。 
+为了扩展commons-logging，在你的`dependency-management`节点中增加如下内容：
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>4.3.0.BUILD-SNAPSHOT</version>
+        <exclusions>
+            <exclusion>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+</dependencies>
+```
+由于没有JCL API的实现，现在应用已经被破坏，因此需要使用一个给定的新的实现去修复它。下一节将展现如何去提供一个使用SLF4J的JCL实现。
+
+##### 使用SLF4J
+SLF4J比`commons-logging`更依赖纯净和运行时高效，因为它使用编译器绑定而不是运行期发现注入的日志框架。这也意味着你必须更娇清晰你在运行期想要实现的，并据此声明或配置它。SLF4J支持绑定许多常用的日志框架，包括JCL，而且还可以进行其他日志框架和它的桥接。因此为了在Sring中使用SLF4J你需要通过SLF4J-JCL的桥接替换`commons-logging`的依赖。一旦你执行这样的操作，来自Spring的日志请求便会转换为对SLF4J API的日志请求，因此如果应用中的其他库也需要使用日志API，你只需要配置在一个地方便可以管理日志系统。
+通常的做法是桥接Spring和SLF4J，并提供SLF4J到Log4J清晰的绑定。你可以支持4个依赖（剥除存在的`commons-logging`）:桥接、SLF4J API、Log4J的绑定、Log4J的实现。你可以在Maven中这样实现：
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>4.3.0.BUILD-SNAPSHOT</version>
+        <exclusions>
+            <exclusion>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>1.5.8</version>
+    </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>1.5.8</version>
+    </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-log4j12</artifactId>
+        <version>1.5.8</version>
+    </dependency>
+    <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>1.2.14</version>
+    </dependency>
+</dependencies>
+```
+这也许看起来是为了获取日志导入很多依赖。的确是，不过这是可选的，而且考虑到类加载，比`commons-logging`表现更好，特别是当你使用一个严格的容器例如OSGI框架。据说由于绑定发生在编译器而不是运行期，性能也有优势。
+对于SLF4J使用者的更加常见的，使用更少的操作，生成更少的依赖项的做法是直接绑定Logback。这个移除了额外的绑定步骤，因为Logback直接继承与SLF4J，因此你只需要依赖两个库（`jcl-over-slf4j`和`logback`）。如果你这样做你可以也需要从其他存在的依赖中（不是Spring）中排除slf4j-api，因为你只需要类路径中的一个版本的API。
+
+##### 使用Log4J
+许多人使用 log4j 作为一个配置管理进程的日志框架。 它是有效 和完善的,事实上它就是我们使用的在运行时构建和测试Spring的。 Spring还提供了一些实用功能以便 Log4j的配置和初始化,所以一些模块的Log4j由一个可选的编译时依赖。为了Log4j可以配合默认的JCL依赖工作（`commons-logging`），你只需要将Log4j放入类路径中，在配置文件声明它（`log4j.properties`或`log4j.xml`）。对于Maven使用者，依赖声明如下：
+```
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>4.3.0.BUILD-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>1.2.14</version>
+    </dependency>
+</dependencies>
+```
+log4j.properties的简单例子如下：
+```
+log4j.rootCategory=INFO, stdout
+
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%d{ABSOLUTE} %5p %t %c{2}:%L - %m%n
+
+log4j.category.org.springframework.beans.factory=DEBUG
+```
+
+##### 运行时容器和原生JCL
+许多人在一个本身实现了JCL的容器上运行Spring程序。IBM Websphere Application Server (WAS)是典型。这经常引发问题，不幸的是并没有银弹可以解决。简单的从你的程序中排除`commons-logging`对于大多数场景来说并不足够。
+需要清除一点：报告的问题很多并不关系到JCL，甚至不关系`commons-logging`，它们通常只是绑定`commons-logging`到另一个框架（一般是Log4J）。由于`commons-logging`运行时发现的版本包括容器所使用的老版本（1.0）和现在大多数人所使用的新版本（1.1）。Spring无法使用JCL API任何例外的部分，所以没有什么被中断，但是只有Spring或者你的程序想要记录日志，你会发现绑定到Log4J的并没有工作。
+在这种情况下是最简单的事情就是转化 类加载器层次结构(IBM称之为“父母最后”)，这样应用程序控制着JCL依赖,而不是容器。这 选择并不总是开放的,但在公共领域也有很多其他的替代方法的建议,你选择取决于容器功能和具体的版本。
 
 
 ### Spring Framework4新功能
-#### Spring 4.0增强和新功能
-Spring框架第一个版本发布于2004年，自发布以来已历经三个主要版本更新:Spring 2.0提供了XML命名空间和AspectJ支持；Spring 2.5增加了注释驱动（annotation-driven）的配置支持；Spring 3.0增加了对Java 5+版本的支持和@Configuration模型。
+#### 3. Spring 4.0增强和新功能
+Spring框架第一个版本发布于2004年，自发布以来已历经三个主要版本更新:Spring 2.0提供了XML命名空间和AspectJ支持；Spring 2.5增加了注释驱动（annotation-driven）的配置支持；Spring 3.0增加了对Java 5+版本的支持和`@Configuration`模型。
 Spring 4.0是最新的主要版本，并且首次完全支持Java 8的特性。你仍然可以使用老版本的Java，但是最低版本的要求已经提高到Java SE 6。我们也借主要版本更新的机会删除了许多过时的类和方法。
 你可以在 [Spring Wiki文档](https://github.com/spring-projects/spring-framework/wiki) 上查看 [升级Spring 4.0迁移指南](https://github.com/spring-projects/spring-framework/wiki/Migrating-from-earlier-versions-of-the-spring-framework)。
 3.1 改进的入门体验
@@ -135,7 +335,6 @@ Java EE 6 或以上版本是Spring4的底线,与JPA2.0和Servlet3.0规范有着�
 
 注意，Hibernate 4.3是JPA 2.1的提供者，因此它只支持Spring4。同样适用用于作为Bean Validation 1.1提供者的Hibernate Validator 5.0。这两个都不支持Spring3.2。
 3.5 Groovy DSL定义Bean
-
 Spring4.0支持使用Groovy DSL来进行外部的bean定义配置。这在概念上类似于使用XML的bean定义，但是支持更简洁的语法。使用Groovy还允许您轻松地将bean定义直接嵌入到引导代码中。例如：
 ```
 def reader = new GroovyBeanDefinitionReader(myApplicationContext)
@@ -228,68 +427,8 @@ Spring 4.1也大大提高了自己的缓存抽象：
 
 Spring 4.1为了在CacheInterface添加一个新的putIfAbsent方法也做了重大的更改。
 4.3 Web改进
-
-    The existing support for resource handling based on the ResourceHttpRequestHandler has been expanded with new abstractions ResourceResolver, ResourceTransformer, and ResourceUrlProvider. A number of built-in implementations provide support for versioned resource URLs (for effective HTTP caching), locating gzipped resources, generating an HTML 5 AppCache manifests, and more. See Section 16.16.7, “Serving of Resources”.
-    JDK 1.8’s java.util.Optional is now supported for @RequestParam, @RequestHeader, and @MatrixVariable controller method arguments.
-    ListenableFuture is supported as a return value alternative to DeferredResult where an underlying service (or perhaps a call to AsyncRestTemplate) already returns ListenableFuture.
-    @ModelAttribute methods are now invoked in an order that respects inter-dependencies. See SPR-6299.
-    Jackson’s @JsonView is supported directly on @ResponseBody and ResponseEntity controller methods for serializing different amounts of detail for the same POJO (e.g. summary vs. detail page). This is also supported with View-based rendering by adding the serialization view type as a model attribute under a special key. See the section called “支持 Jackson 序列化视图” for details.
-    JSONP is now supported with Jackson. See the section called “支持 Jackson JSONP”.
-    A new lifecycle option is available for intercepting @ResponseBody and ResponseEntity methods just after the controller method returns and before the response is written. To take advantage declare an @ControllerAdvice bean that implements ResponseBodyAdvice. The built-in support for @JsonView and JSONP take advantage of this. See Section 16.4.1, “使用 HandlerInterceptor 拦截请求”.
-
-    There are three new HttpMessageConverter options:
-        Gson — lighter footprint than Jackson; has already been in use in Spring Android.
-        Google Protocol Buffers — efficient and effective as an inter-service communication data protocol within an enterprise but can also be exposed as JSON and XML for browsers.
-        Jackson based XML serialization is now supported through the jackson-dataformat-xml extension. When using @EnableWebMvc or <mvc:annotation-driven/>, this is used by default instead of JAXB2 if jackson-dataformat-xml is in the classpath. 
-    Views such as JSPs can now build links to controllers by referring to controller mappings by name. A default name is assigned to every @RequestMapping. For example FooController with method handleFoo is named "FC#handleFoo". The naming strategy is pluggable. It is also possible to name an @RequestMapping explicitly through its name attribute. A new mvcUrl function in the Spring JSP tag library makes this easy to use in JSP pages. See Section 16.7.2, “Building URIs to Controllers and methods from views”.
-    ResponseEntity provides a builder-style API to guide controller methods towards the preparation of server-side responses, e.g. ResponseEntity.ok().
-    RequestEntity is a new type that provides a builder-style API to guide client-side REST code towards the preparation of HTTP requests.
-
-    MVC Java config and XML namespace:
-        View resolvers can now be configured including support for content negotiation, see Section 16.16.6, “View Resolvers”.
-        View controllers now have built-in support for redirects and for setting the response status. An application can use this to configure redirect URLs, render 404 responses with a view, send "no content" responses, etc. Some use cases are listed here.
-        Path matching customizations are frequently used and now built-in. See Section 16.16.9, “Path Matching”. 
-    Groovy markup template support (based on Groovy 2.3). See the GroovyMarkupConfigurer and respecitve ViewResolver and ‘View’ implementations. 
-
 4.4 WebSocket STOMP消息改进
-
-    SockJS (Java) client-side support. See SockJsClient and classes in same package.
-    New application context events SessionSubscribeEvent and SessionUnubscribeEvent published when STOMP clients subscribe and unsubscribe.
-    New "websocket" scope. See Section 20.4.13, “WebSocket Scope”.
-    @SendToUser can target only a single session and does not require an authenticated user.
-    @MessageMapping methods can use dot "." instead of slash "/" as path separator. See SPR-11660.
-    STOMP/WebSocket monitoring info collected and logged. See Section 20.4.15, “Runtime Monitoring”.
-    Significantly optimized and improved logging that should remain very readable and compact even at DEBUG level.
-    Optimized message creation including support for temporary message mutability and avoiding automatic message id and timestamp creation. See Javadoc of MessageHeaderAccessor.
-    STOMP/WebSocket connections that have not activity 60 seconds after the WebSocket session is established. See SPR-11884. 
-
 4.5 测试改进
-
-    Groovy scripts can now be used to configure the ApplicationContext loaded for integration tests in the TestContext framework.
-        See the section called “Context configuration with Groovy scripts” for details. 
-
-    Test-managed transactions can now be programmatically started and ended within transactional test methods via the new TestTransaction API.
-        See the section called “Programmatic transaction management” for details. 
-
-    SQL script execution can now be configured declaratively via the new @Sql and @SqlConfig annotations on a per-class or per-method basis.
-        See the section called “Executing SQL scripts” for details. 
-
-    Test property sources which automatically override system and application property sources can be configured via the new @TestPropertySource annotation.
-        See the section called “Context configuration with test property sources” for details. 
-
-    Default TestExecutionListeners can now be automatically discovered.
-        See the section called “Automatic discovery of default TestExecutionListeners” for details. 
-
-    Custom TestExecutionListeners can now be automatically merged with the default listeners.
-        See the section called “Merging TestExecutionListeners” for details. 
-
-    The documentation for transactional testing support in the TestContext framework has been improved with more thorough explanations and additional examples.
-        See the section called “Transaction management” for details. 
-    Various improvements to MockServletContext, MockHttpServletRequest, and other Servlet API mocks.
-    AssertThrows has been refactored to support Throwable instead of Exception.
-    In Spring MVC Test, JSON responses can be asserted with JSON Assert as an extra option to using JSONPath much like it has been possible to do for XML with XMLUnit.
-    MockMvcBuilder recipes can now be created with the help of MockMvcConfigurer. This was added to make it easy to apply Spring Security setup but can be used to encapsulate common setup for any 3rd party framework or within a project.
-    MockRestServiceServer now supports the AsyncRestTemplate for client-side testing.
 
 ### 核心技术
 
