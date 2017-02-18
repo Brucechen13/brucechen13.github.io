@@ -5,7 +5,7 @@ subtitle:   ""
 date:       2016-03-20
 author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
-published: false
+published: true
 tags:
     - Java
     - 读书笔记

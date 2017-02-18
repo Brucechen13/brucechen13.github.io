@@ -5,10 +5,9 @@ subtitle:   ""
 date:       2016-03-05
 author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
-published: false
+published: true
 tags:
-    - Java
-    - 读书笔记
+    - 考研
 ---
 803计算机学科基础综合
 

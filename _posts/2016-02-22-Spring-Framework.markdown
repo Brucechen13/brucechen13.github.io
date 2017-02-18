@@ -5,7 +5,7 @@ subtitle:   "中文翻译"
 date:       2016-02-22
 author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
-published: false
+published: true
 tags:
     - Java
 ---
