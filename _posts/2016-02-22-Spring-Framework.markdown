@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "Spring Framework Reference Documentation"
+title:      "Spring Framework"
 subtitle:   "中文翻译"
 date:       2016-02-22
 author:     "brucechen"
@@ -8,8 +8,6 @@ header-img: "img/post-bg-java.jpg"
 published: false
 tags:
     - Java
-    - Spring
-	- 翻译
 ---
 
 [原文链接](http://docs.spring.io/spring/docs/4.3.0.BUILD-SNAPSHOT/spring-framework-reference/htmlsingle/)
