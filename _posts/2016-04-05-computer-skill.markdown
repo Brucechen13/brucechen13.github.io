@@ -2,7 +2,7 @@
 layout:     post
 title:      "计算机专业知识"
 subtitle:   ""
-date:       2016-03-05
+date:       2016-04-05
 author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
 published: true
