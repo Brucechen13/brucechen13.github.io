@@ -75,7 +75,20 @@ re.X|使用更灵活格式实现正则表达式
 1. 文件查找，查找所有**test+数字.txt**的文件
 
 	参考输入:['test001.txt', 'test02.txt', 'test003', 'test.txt', 'test001.rar']
+	
+	'''
+	for str in strs:
+		if re.match(r'.*test\d*.txt', str):
+			print(str)
+	'''
 
 2. 文件名更改，更改所有**test+数字.txt**的文件名为**new+数字.txt**
 
 	参考输入：同上
+	
+	'''
+	s = re.match(r'(.*test)(\d*).txt', str)
+    if s is not None:
+        print(str)
+        print(s.group(1) + " " + s.group(2))
+	'''
