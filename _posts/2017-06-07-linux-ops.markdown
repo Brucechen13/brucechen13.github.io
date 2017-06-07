@@ -1,0 +1,50 @@
+---
+layout:     post
+title:      "linux操作笔记"
+subtitle:   "快乐的Linux命令行笔记"
+date:       2017-06-07
+author:     "brucechen"
+header-img: "img/post-bg-linux.jpg"
+published: false
+tags:
+    - Linux
+    - 读书笔记
+---
+
+### 学习Shell
+
+#### Shell命令
+* df —查看磁盘剩余空间
+* free —查看内存使用情况
+* pwd —打印出当前工作目录名
+* cd —更改目录
+* ls —列出目录内容
+* file —确定文件类型
+* less —浏览文件内容
+* cp —复制文件和目录
+* mv —移动/重命名文件和目录
+* mkdir —创建目录
+* rm —删除文件和目录
+* ln —创建硬链接和符号链接
+* type –说明怎样解释一个命令名
+* which –显示会执行哪个可执行程序
+* man –显示命令手册页
+* apropos –显示一系列适合的命令
+* info –显示命令 info
+* whatis –显示一个命令的简洁描述
+* alias –创建命令别名
+* cat －连接文件
+* sort －排序文本行
+* uniq －报道或省略重复行
+* grep －打印匹配行
+* wc －打印文件中换行符，字，和字节个数
+* head －输出文件第一部分
+* tail - 输出文件最后一部分
+
+
+
+### 配置文件与环境
+
+### 常用任务与工具
+
+### Shell编程
