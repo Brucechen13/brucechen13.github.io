@@ -5,7 +5,7 @@ subtitle:   "图解HTTP笔记"
 date:       2017-06-08
 author:     "brucechen"
 header-img: "img/post-bg-2017.jpg"
-published: false
+published: true
 tags:
     - HTTP
     - 读书笔记
@@ -102,4 +102,35 @@ HTTP报文首部：
 	
 
 ### Web安全
+
+#### HTTPS协议
+
+HTTP虽然应用广泛，但也存在一些不足：
+* 通信适用明文，可能被窃取
+* 不验证通信方身份，可能遭遇伪装
+* 无法证明报文的完整性，可能被篡改
+
+为了防止信息被窃听，除了加密信息，HTTP协议还可以采用SSL或TLS组合使用，加密HTTP的通信内容。与SSL组合使用的HTTP就成为HTTPS（超文本传输安全协议）。通过SSL，还可以验证服务器或客户端的证书来确保通信方身份。
+
+为了避免报文被中间人篡改，可以采用MD5和SHA-1等散列值校验的方法，以及确认文件的数字签名方法。SSL也提供了认证和加密处理及摘要功能。HTTP+加密+认证+完整性保护=HTTPS。
+
+#### HTTP认证
+
+* BASIC认证
+	将用户ID和密码以Base64方式编码后发送，使用Authorization首部字段
+* DIGEST认证
+	服务器发送临时的质询码，客户端发送摘要以及计算出的响应码，使用Authorization首部字段
+* SSL认证
+	采用HTTPS客户端证书完成认证。
+* FormBase认证
+	表单的认证，客户端向服务器发送登录信息。可以和SSL认证配合使用。
+	
+#### WEB攻击
+
+* SQL注入攻击
+* OS命令注入攻击
+* 跨站脚本攻击
+* HTTP首部注入攻击
+
+
 
