@@ -1,7 +1,7 @@
 ---
 layout:     post
-title:      "笔记"
-subtitle:   "图片相似度检测笔记"
+title:      "图片相似度检测"
+subtitle:   "基于词袋模型的图片检索"
 date:       2017-08-19
 author:     "brucechen"
 header-img: "img/post-bg-2017.jpg"

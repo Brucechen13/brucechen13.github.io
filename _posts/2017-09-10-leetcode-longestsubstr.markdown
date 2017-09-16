@@ -1,14 +1,14 @@
 ---
 layout:     post
-title:      "笔记"
+title:      "最长不重复子串"
 subtitle:   ""
 date:       2017-09-10
 author:     "brucechen"
-header-img: "img/post-bg-java.jpg"
-published: false
+header-img: "img/post-bg-code.jpg"
+published: true
 tags:
-    - Java
-    - 读书笔记
+    - code
+    - 算法
 ---
 
 ### Longest Substring Without Repeating Characters
