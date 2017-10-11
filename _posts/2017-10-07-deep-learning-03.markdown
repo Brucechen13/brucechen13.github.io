@@ -7,7 +7,7 @@ author:     "brucechen"
 header-img: "img/post-bg-ai.jpg"
 published: true
 tags:
-    - Java
+    - DL
     - 读书笔记
 ---
 
@@ -40,7 +40,7 @@ A2 = sigmoid(Z2)
 dZ2 = A2 - Y
 dW2 = A1*dZ2
 db2 = dZ2
-dZ1 = (1-A1^2)*W2
+dZ1 = (1-A1^2)*dZ2*W2
 dW1 = X*dZ1
 db1 = dZ1
 `
