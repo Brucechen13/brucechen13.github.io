@@ -1,0 +1,107 @@
+---
+layout:     post
+title:      "leetcode算法笔记"
+subtitle:   "718-Maximum Length of Repeated Subarray"
+date:       2018-03-19
+author:     "brucechen"
+header-img: "img/post-bg-java.jpg"
+published: false
+tags:
+    - Java
+    - 读书笔记
+---
+
+### 描述
+
+给出两个整型数组，返回两者中最长的相同子串长度
+如：
+A = [5,4,3,2,1], B = [3,2,1,4,5]
+最长相同子串为[3,2,1],故返回长度3
+
+限制：
+1 <= len(A), len(B) <= 1000
+0 <= A[i], B[i] < 100
+
+
+### 解法一
+
+直接暴力求解，两层循环找出A每两个位置的子串，构建为字符串
+
+再两层循环找出B每两个位置的子串，构建为字符串，判断在A中是否存在
+
+代码如下：
+```
+Set<String> cached = new HashSet<>();
+for(int i = 0; i < A.length; i ++){
+    String cur = "";
+    for(int j = i; j < A.length; j ++){
+        cur += A[j] + " ";
+        cached.add(cur);
+    }
+}
+for(int i = 0; i < B.length; i ++){
+    String cur = "";
+    for(int j = i; j < B.length; j ++){
+        cur += B[j] + " ";
+        if(cached.contains(cur) && cur.split(" ").length > len){
+            len = cur.split(" ").length;
+        }
+    }
+}
+
+```
+
+时间复杂度较高。
+
+### 解法二
+
+使用动态规划的思路求解
+
+```
+int len = 0;
+int[][] dp = new int[A.length+1][B.length+1];
+int[][] dp0 = new int[A.length+1][B.length+1];
+for(int i = 0; i < A.length; i ++){
+    if(A[i] == B[0]){
+        dp0[i][0] = 1;
+        dp[i][0] = 1;
+    }
+}
+for(int i = 0; i < B.length; i ++){
+    if(A[0] == B[i]){
+        dp0[0][i] = 1;
+        dp[0][i] = 1;
+    }
+}
+for(int i = 1 ; i < A.length; i ++){
+    for(int j = 1 ;j < B.length; j ++){
+        if(A[i] == B[j]){
+            dp0[i][j] = dp0[i-1][j-1]+1;
+        }else{
+            dp0[i][j] = 0;
+        }
+        dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+        dp[i][j] = Math.max(dp[i][j], dp0[i][j]);
+    }
+}
+return dp[A.length-1][B.length-1];
+```
+
+
+### 解法三
+
+动态规划优化
+
+```
+int[] dp=new int[lenB+1];
+int maxLength=0;
+for (int i=0;i<lenA;i++)
+    for (int j=lenB-1;j>=0;j--){
+        if (A[i]==B[j]){
+            dp[j+1]=dp[j]+1;
+            maxLength=Math.max(dp[j+1],maxLength);
+        }else
+            dp[j+1]=0;
+    }
+return maxLength;
+```
