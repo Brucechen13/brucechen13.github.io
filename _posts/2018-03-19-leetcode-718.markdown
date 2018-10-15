@@ -5,7 +5,7 @@ subtitle:   "718-Maximum Length of Repeated Subarray"
 date:       2018-03-19
 author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
-published: false
+published: true
 tags:
     - Java
     - 读书笔记

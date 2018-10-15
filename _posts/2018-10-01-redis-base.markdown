@@ -5,7 +5,7 @@ subtitle:   ""
 date:       2018-10-01
 author:     "brucechen"
 header-img: "img/post-bg-code.jpg"
-published: false
+published: true
 tags:
     - Redis
     - 读书笔记
