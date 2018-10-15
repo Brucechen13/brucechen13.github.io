@@ -1,0 +1,78 @@
+---
+layout:     post
+title:      "Java基本知识笔记"
+subtitle:   "NIO相关"
+date:       2018-10-15
+author:     "brucechen"
+header-img: "img/post-bg-java.jpg"
+published: false
+tags:
+    - Java
+    - 读书笔记
+---
+
+### NIO介绍
+
+NIO是Java 4里面提供的新的API，目的是用来解决传统IO的问题。NIO就是NOBlocking IO,非阻塞IO，与传统IO流的区别就是传统IO进行时需要阻塞进程，而NIO可以在IO事件发生时让出CPU。
+
+### NIO组件
+
+Java中的NIO主要包括三个组件，`Channel`、`Buffer`和`Selector`。可以认为Channel就是数据传输的管道，Buffer是数据传输的缓存区，Selector是多路IO复用的选择器。
+
+##### Channel
+
+NIO的Channel可以分为以下几种：
+
+- FileChannel
+- SocketChanel
+- ServerSocketChannel
+- DatagramChannel
+
+Channel和IO流中的steam很像，不过steam是单向流，而Channel是双向的，可以进行读写。
+
+以下是一个通过Channel写文件的例子：
+
+```
+    File file = new File("data.txt");
+    FileOutputStream outputStream = new FileOutputStrea(file);
+    FileChannel channel = outputStream.getChannel();
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
+    String string = "java nio";
+    buffer.put(string.getBytes());
+    buffer.flip();     //此处必须要调用buffer的flip方法
+    channel.write(buffer);
+    channel.close();
+    outputStream.close();
+```
+
+#### Buffer
+
+Buffer就是用来存储Channel读写数据的缓存区，是一块连续的字节数组。
+
+下图的图描述了从一个客户端向服务端发送数据，然后服务端接收数据的过程。客户端发送数据时，必须先将数据存入Buffer中，然后将Buffer中的内容写入通道。服务端这边接收数据必须通过Channel将数据读入到Buffer中，然后再从Buffer中取出数据来处理。:
+
+![java-javascript](/img/in-post/nio/channel-buffer.jpg)
+
+NIO中，Buffer有多种子类实现：
+
+- ByteBuffer
+- IntBuffer
+- CharBuffer
+- LongBuffer
+- DoubleBuffer
+- FloatBuffer
+- ShortBuffer
+
+实际中使用最多的还是ByteBuffer。
+
+#### Selector
+
+Selector类是对于IO多路复用的实现，是NIO的核心类。
+
+Selector能够检测多个注册的通道上是否有事件发生，如果有事件发生，便获取事件然后针对每个事件进行相应的响应处理。这样一来，只是用一个单线程就可以管理多个通道，也就是管理多个连接。这样使得只有在连接真正有读写事件发生时，才会调用函数来进行读写，就大大地减少了系统开销，并且不必为每个连接都创建一个线程，不用去维护多个线程，并且避免了多线程之间的上下文切换导致的开销。
+
+#### Selector
+
+### NIO示例
+
+### NIO相关
