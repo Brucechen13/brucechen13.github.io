@@ -5,7 +5,7 @@ subtitle:   "NIO相关"
 date:       2018-10-15
 author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
-published: false
+published: true
 tags:
     - Java
     - 读书笔记
@@ -13,7 +13,7 @@ tags:
 
 ### NIO介绍
 
-NIO是Java 4里面提供的新的API，目的是用来解决传统IO的问题。NIO就是NOBlocking IO,非阻塞IO，与传统IO流的区别就是传统IO进行时需要阻塞进程，而NIO可以在IO事件发生时让出CPU。
+NIO是Java 4里面提供的新的API，目的是用来解决传统IO的问题。NIO就是NOBlocking IO,非阻塞IO，与传统IO流的区别就是传统IO进行时需要阻塞线程，而NIO可以在IO事件发生时让出CPU。
 
 ### NIO组件
 
@@ -28,7 +28,7 @@ NIO的Channel可以分为以下几种：
 - ServerSocketChannel
 - DatagramChannel
 
-Channel和IO流中的steam很像，不过steam是单向流，而Channel是双向的，可以进行读写。
+Channel和IO流中的stream很像，不过stream是单向流，而Channel是双向的，可以进行读写。
 
 以下是一个通过Channel写文件的例子：
 
@@ -65,14 +65,136 @@ NIO中，Buffer有多种子类实现：
 
 实际中使用最多的还是ByteBuffer。
 
+Bufferk可以很方便的查询已缓存数据的位置和数量，常用变量如下：
+- capacity 缓冲区数组的总长度
+- position 下一个要操作的数据元素的位置
+- limit 缓冲区数组中不可操作的下一个元素的位置：limit<=capacity
+- mark 用于记录当前position的前一个位置或者默认是-1
+
+通过`allocate`方法可以为Buffer分配数据，初始状态`position`位置为0，`capacity`和`limit`都是数组的长度，当写入k字节数字后，`position`变为k。
+
+通过`flip`方法可以使`position`回到开始处，`limit`移动到上次写的末尾，表示可以进行读取的范围。
+
+通过`clear`方法可以`position`回到开始处，`limit`重置为数组的长度，表示再次开始写。
+
+如果上次数据还未读完但是需要开始写数据，可以通过`compact`方法，将所有未读的数据拷贝到Buffer起始处，`position`未读数据的末尾，`limit`重置为数组的长度。
+
+通过`mark`方法，可以标记Buffer中的一个特定的`position`，之后可以通过调用`reset`方法恢复到这个`position`。
+
+通过`rewind`方法将`position`设回0，所以你可以重读Buffer中的所有数据。`limit`保持不变，仍然表示能从Buffer中读取多少个元素。
+
 #### Selector
 
-Selector类是对于IO多路复用的实现，是NIO的核心类。
+Selector类是对于IO多路复用的实现，是NIO的核心类，可以通过单线程管理多个Channel。
 
 Selector能够检测多个注册的通道上是否有事件发生，如果有事件发生，便获取事件然后针对每个事件进行相应的响应处理。这样一来，只是用一个单线程就可以管理多个通道，也就是管理多个连接。这样使得只有在连接真正有读写事件发生时，才会调用函数来进行读写，就大大地减少了系统开销，并且不必为每个连接都创建一个线程，不用去维护多个线程，并且避免了多线程之间的上下文切换导致的开销。
 
-#### Selector
+Select可以通过`Channel.register`方法添加Channel检测，检测事件分为四种：
+1. Connect
+2. Accept
+3. Read
+4. Write
+
+Selector可以通过select方法返回所有注册过且准备就绪的Channel。通过selectedKeys方法返回需要处理的对象，SelectionKey对象包含以下常用属性：
+- interest集合 感兴趣的事件集合
+- ready集合 通道已经准备就绪的操作的集合
+- Channel 绑定的Channel
+- Selector 监视的Selector
 
 ### NIO示例
 
+可以通过NIO很方便的实现非阻塞的Socket读写。
+
+客户端代码：
+```
+    ByteBuffer buffer = ByteBuffer.allocate(1024);
+    SocketChannel socketChannel = null;
+    socketChannel = SocketChannel.open();
+    socketChannel.configureBlocking(false); // 设置为非阻塞
+    socketChannel.connect(new InetSocketAddres("127.0.0.1",8080));
+    if(socketChannel.finishConnect())
+    {
+        int i=0;
+        while(true)
+        {
+            TimeUnit.SECONDS.sleep(1);
+            String info = "I'm "+i+++"-th information from client";
+            buffer.clear();
+            buffer.put(info.getBytes());
+            buffer.flip();
+            while(buffer.hasRemaining()){
+                System.out.println(buffer);
+                socketChannel.write(buffer);
+            }
+        }
+    }
+```
+
+服务端代码：
+```
+    Selector selector = null;
+    ServerSocketChannel ssc = null;
+    selector = Selector.open();
+    ssc= ServerSocketChannel.open();
+    ssc.socket().bind(new InetSocketAddress(8080));
+    ssc.configureBlocking(false); // 设置非阻塞
+    ssc.register(selector, SelectionKey.OP_ACCEPT);// 监听ACCEPT事件
+    while(true){
+        if(selector.select(3000) == 0){
+            System.out.println("==");
+            continue;
+        }
+        Iterator<SelectionKey> iter = selector.selectedKeys().iterator(); // 返回所有需要处理的事件
+        while(iter.hasNext()){
+            SelectionKey key = iter.next();
+            if(key.isAcceptable()){
+                handleAccept(key);
+            }
+            if(key.isReadable()){
+                handleRead(key);
+            }
+            if(key.isWritable() && key.isValid()){
+                handleWrite(key);
+            }
+            if(key.isConnectable()){
+                System.out.println("isConnectable = true");
+            }
+            iter.remove();
+        }
+    }
+
+    public static void handleAccept(SelectionKey key) throws IOException{
+        ServerSocketChannel ssChannel = (ServerSocketChannel)key.channel();
+        SocketChannel sc = ssChannel.accept();
+        sc.configureBlocking(false);
+        sc.register(key.selector(), SelectionKey.OP_READ,ByteBuffer.allocateDirect(1024));
+    }
+```
+
 ### NIO相关
+
+#### 内存映射文件
+
+JAVA处理大文件，一般用BufferedReader,BufferedInputStream这类带缓冲的IO类，不过如果文件超大的话，更快的方式是采用MappedByteBuffer。
+
+MappedByteBuffer是NIO引入的文件内存映射方案，读写性能极高。NIO最主要的就是实现了对异步操作的支持。其中一种通过把一个套接字通道(SocketChannel)注册到一个选择器(Selector)中,不时调用后者的选择(select)方法就能返回满足的选择键(SelectionKey),键中包含了SOCKET事件信息。这就是select模型。
+
+SocketChannel的读写是通过一个类叫ByteBuffer来操作的.这个类本身的设计是不错的,比直接操作byte[]方便多了. ByteBuffer有两种模式:直接/间接.间接模式最典型(也只有这么一种)的就是HeapByteBuffer,即操作堆内存 (byte[]).但是内存毕竟有限,如果我要发送一个1G的文件怎么办?不可能真的去分配1G的内存.这时就必须使用"直接"模式,即 MappedByteBuffer,文件映射.
+
+先中断一下,谈谈操作系统的内存管理.一般操作系统的内存分两部分:物理内存;虚拟内存.虚拟内存一般使用的是页面映像文件,即硬盘中的某个(某些)特殊的文件.操作系统负责页面文件内容的读写,这个过程叫"页面中断/切换". MappedByteBuffer也是类似的,你可以把整个文件(不管文件有多大)看成是一个ByteBuffer.MappedByteBuffer 只是一种特殊的ByteBuffer，即是ByteBuffer的子类。 MappedByteBuffer 将文件直接映射到内存（这里的内存指的是虚拟内存，并不是物理内存）。通常，可以映射整个文件，如果文件比较大的话可以分段进行映射，只要指定文件的那个部分就可以。
+
+#### Scatter/Gatter
+
+分散（scatter）从Channel中读取是指在读操作时将读取的数据写入多个buffer中。因此，Channel将从Channel中读取的数据“分散（scatter）”到多个Buffer中。
+
+聚集（gather）写入Channel是指在写操作时将多个buffer的数据写入同一个Channel，因此，Channel 将多个Buffer中的数据“聚集（gather）”后发送到Channel。
+
+scatter / gather经常用于需要将传输的数据分开处理的场合，例如传输一个由消息头和消息体组成的消息，你可能会将消息体和消息头分散到不同的buffer中，这样你可以方便的处理消息头和消息体。
+
+#### transferFrom & transferTo
+
+FileChannel的transferFrom()方法可以将数据从源通道传输到FileChannel中。transferTo()方法将数据从FileChannel传输到其他的channel中。
+
+#### Pipe
+
+Java NIO 管道是2个线程之间的单向数据连接。Pipe有一个source通道和一个sink通道。数据会被写到sink通道，从source通道读取。
