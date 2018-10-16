@@ -193,7 +193,7 @@ scatter / gather经常用于需要将传输的数据分开处理的场合，例�
 
 #### transferFrom & transferTo
 
-FileChannel的transferFrom()方法可以将数据从源通道传输到FileChannel中。transferTo()方法将数据从FileChannel传输到其他的channel中。
+FileChannel的transferFrom()方法可以将数据从源通道传输到FileChannel中。transferTo()方法将数据从FileChannel传输到其他的channel中。这种方式可以避免了传统通过循环write方式导致的内存拷贝问题。
 
 #### Pipe
 
