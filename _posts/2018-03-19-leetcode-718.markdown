@@ -7,7 +7,7 @@ author:     "brucechen"
 header-img: "img/post-bg-java.jpg"
 published: true
 tags:
-    - Java
+    - 算法
     - 读书笔记
 ---
 
